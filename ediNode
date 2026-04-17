@@ -1,0 +1,46 @@
+package com.pio.edi.document.handling.dto;
+
+import lombok.Data;
+
+import java.util.*;
+
+@Data
+public class EdiNode {
+
+    private final String name;
+
+    private final List<String> elements;
+    private final List<EdiNode> children;
+    private final Map<String, Object> attributes;
+
+    public EdiNode(String name) {
+        this.name = name;
+        this.elements = new ArrayList<>();
+        this.children = new ArrayList<>();
+        this.attributes = new HashMap<>();
+    }
+
+    public void addElement(String value) {
+        elements.add(value);
+    }
+
+    public void addChild(EdiNode node) {
+        children.add(node);
+    }
+
+    // REQUIRED for ISA / GS / ST
+    public void addAttribute(String key, Object value) {
+        attributes.put(key, value);
+    }
+
+    //Optional helper
+    public Optional<Object> getAttribute(String key) {
+        return Optional.ofNullable(attributes.get(key));
+    }
+
+    public Optional<EdiNode> findFirstChild(String name) {
+        return children.stream()
+                .filter(c -> c.getName().equals(name))
+                .findFirst();
+    }
+}
