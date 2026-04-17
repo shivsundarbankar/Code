@@ -1,0 +1,431 @@
+{
+  "success": true,
+  "message": "Parsed Data",
+  "data": {
+    "name": "EDI_DOCUMENT",
+    "elements": [],
+    "children": [
+      {
+        "name": "ISA",
+        "elements": [],
+        "children": [
+          {
+            "name": "GS",
+            "elements": [],
+            "children": [
+              {
+                "name": "ST",
+                "elements": [],
+                "children": [
+                  {
+                    "name": "BEG",
+                    "elements": [
+                      "00",
+                      "NE",
+                      "PO987654321",
+                      "20260418"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "REF",
+                    "elements": [
+                      "DP",
+                      "045"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "REF",
+                    "elements": [
+                      "IA",
+                      "789456"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "REF",
+                    "elements": [
+                      "ZZ",
+                      "ONLINE-ORDER"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "DTM",
+                    "elements": [
+                      "002",
+                      "20260502"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "DTM",
+                    "elements": [
+                      "010",
+                      "20260418"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "FOB",
+                    "elements": [
+                      "PP",
+                      "OR",
+                      "ACME WHSE"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "ITD",
+                    "elements": [
+                      "01",
+                      "3",
+                      "1",
+                      "45",
+                      "2",
+                      "30"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "TD5",
+                    "elements": [
+                      "B",
+                      "2",
+                      "UPSN",
+                      "M",
+                      "UNITED PARCEL SERVICE"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "MSG",
+                    "elements": [
+                      "DELIVER BETWEEN 9AM-5PM — DC APPOINTMENT REQUIRED"
+                    ],
+                    "children": [],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "N1",
+                    "elements": [],
+                    "children": [
+                      {
+                        "name": "N1",
+                        "elements": [
+                          "BT",
+                          "ACME RETAIL INC.",
+                          "92",
+                          "10001"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "N3",
+                        "elements": [
+                          "500 CORPORATE BLVD"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "N4",
+                        "elements": [
+                          "CHICAGO",
+                          "IL",
+                          "60601",
+                          "US"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      }
+                    ],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "N1",
+                    "elements": [],
+                    "children": [
+                      {
+                        "name": "N1",
+                        "elements": [
+                          "ST",
+                          "ACME DC CENTRAL",
+                          "92",
+                          "30001"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "N3",
+                        "elements": [
+                          "1200 LOGISTICS WAY"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "N4",
+                        "elements": [
+                          "JOLIET",
+                          "IL",
+                          "60431",
+                          "US"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      }
+                    ],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "N1",
+                    "elements": [],
+                    "children": [
+                      {
+                        "name": "N1",
+                        "elements": [
+                          "SU",
+                          "XYZ MANUFACTURING INC.",
+                          "92",
+                          "90001"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      }
+                    ],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "PO1",
+                    "elements": [],
+                    "children": [
+                      {
+                        "name": "PO1",
+                        "elements": [
+                          "00010",
+                          "250",
+                          "EA",
+                          "9.75",
+                          "PE",
+                          "VN",
+                          "XYZ-1001",
+                          "BP",
+                          "ACME-RED-01"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "PID",
+                        "elements": [],
+                        "children": [
+                          {
+                            "name": "PID",
+                            "elements": [
+                              "F",
+                              "STANDARD WIDGET - RED"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          },
+                          {
+                            "name": "DTM",
+                            "elements": [
+                              "067",
+                              "20260502"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          }
+                        ],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "SCH",
+                        "elements": [],
+                        "children": [
+                          {
+                            "name": "SCH",
+                            "elements": [
+                              "150",
+                              "EA",
+                              "002",
+                              "20260428"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          }
+                        ],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "SCH",
+                        "elements": [],
+                        "children": [
+                          {
+                            "name": "SCH",
+                            "elements": [
+                              "100",
+                              "EA",
+                              "002",
+                              "20260502"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          }
+                        ],
+                        "attributes": {}
+                      }
+                    ],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "PO1",
+                    "elements": [],
+                    "children": [
+                      {
+                        "name": "PO1",
+                        "elements": [
+                          "00020",
+                          "75",
+                          "EA",
+                          "58.00",
+                          "PE",
+                          "VN",
+                          "XYZ-2005",
+                          "BP",
+                          "ACME-HD-05"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "PID",
+                        "elements": [],
+                        "children": [
+                          {
+                            "name": "PID",
+                            "elements": [
+                              "F",
+                              "HEAVY DUTY GEAR ASSEMBLY"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          },
+                          {
+                            "name": "DTM",
+                            "elements": [
+                              "067",
+                              "20260502"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          }
+                        ],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "SAC",
+                        "elements": [],
+                        "children": [
+                          {
+                            "name": "SAC",
+                            "elements": [
+                              "A",
+                              "C310",
+                              "150"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          }
+                        ],
+                        "attributes": {}
+                      },
+                      {
+                        "name": "SAC",
+                        "elements": [],
+                        "children": [
+                          {
+                            "name": "SAC",
+                            "elements": [
+                              "C",
+                              "D240",
+                              "75"
+                            ],
+                            "children": [],
+                            "attributes": {}
+                          }
+                        ],
+                        "attributes": {}
+                      }
+                    ],
+                    "attributes": {}
+                  },
+                  {
+                    "name": "CTT",
+                    "elements": [],
+                    "children": [
+                      {
+                        "name": "CTT",
+                        "elements": [
+                          "2"
+                        ],
+                        "children": [],
+                        "attributes": {}
+                      }
+                    ],
+                    "attributes": {}
+                  }
+                ],
+                "attributes": {
+                  "Control": "12450001",
+                  "DocType": "850",
+                  "Name": "Purchase Order"
+                }
+              }
+            ],
+            "attributes": {
+              "Control": "1245",
+              "GroupType": "PO",
+              "ApplReceiver": "XYZMFG",
+              "StandardVersion": "004010",
+              "Time": "1147",
+              "StandardCode": "X",
+              "Date": "20260418",
+              "ApplSender": "ACMERETAIL"
+            }
+          }
+        ],
+        "attributes": {
+          "Authorization": "          ",
+          "Control": "000001245",
+          "TestIndicator": "T",
+          "AuthorizationQual": "00",
+          "Version": "00401",
+          "StandardsId": "U",
+          "AckRequest": "0",
+          "SecurityQual": "00",
+          "Standard": "ANSI X.12",
+          "Time": "1147",
+          "Security": "          ",
+          "Date": "260418"
+        }
+      }
+    ],
+    "attributes": {}
+  },
+  "timestamp": "2026-04-18T00:50:10.6948113"
+}
