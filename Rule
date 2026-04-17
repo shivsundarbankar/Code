@@ -1,0 +1,65 @@
+{
+  "outputSchema": "PurchaseOrder",
+  "fields": [
+    { "target": "poNumber",       "path": "BEG.2",                    "transform": "trim",              "required": true },
+    { "target": "orderDate",      "path": "DTM[010].1",               "transform": "parseDate:yyyyMMdd","required": true },
+    { "target": "deliveryDate",   "path": "DTM[002].1",               "transform": "parseDate:yyyyMMdd","required": false },
+    { "target": "orderType",      "path": "BEG.1",                    "transform": null,                "required": false },
+    { "target": "shipFrom",       "path": "FOB.2",                    "transform": null,                "required": false },
+    { "target": "carrier",        "path": "TD5.4",                    "transform": null,                "required": false },
+    { "target": "carrierCode",    "path": "TD5.2",                    "transform": null,                "required": false },
+    { "target": "specialMsg",     "path": "MSG.0",                    "transform": null,                "required": false },
+    { "target": "deptNumber",     "path": "REF[DP].1",                "transform": null,                "required": false },
+    { "target": "internalAccount","path": "REF[IA].1",                "transform": null,                "required": false },
+    { "target": "buyer.name",     "path": "N1[BT].N1.1",             "transform": null,                "required": true },
+    { "target": "buyer.id",       "path": "N1[BT].N1.3",             "transform": null,                "required": false },
+    { "target": "buyer.street",   "path": "N1[BT].N3.0",             "transform": null,                "required": false },
+    { "target": "buyer.city",     "path": "N1[BT].N4.0",             "transform": null,                "required": false },
+    { "target": "buyer.state",    "path": "N1[BT].N4.1",             "transform": null,                "required": false },
+    { "target": "buyer.zip",      "path": "N1[BT].N4.2",             "transform": null,                "required": false },
+    { "target": "shipTo.name",    "path": "N1[ST].N1.1",             "transform": null,                "required": false },
+    { "target": "shipTo.id",      "path": "N1[ST].N1.3",             "transform": null,                "required": false },
+    { "target": "shipTo.street",  "path": "N1[ST].N3.0",             "transform": null,                "required": false },
+    { "target": "shipTo.city",    "path": "N1[ST].N4.0",             "transform": null,                "required": false },
+    { "target": "shipTo.state",   "path": "N1[ST].N4.1",             "transform": null,                "required": false },
+    { "target": "shipTo.zip",     "path": "N1[ST].N4.2",             "transform": null,                "required": false },
+    { "target": "supplier.name",  "path": "N1[SU].N1.1",             "transform": null,                "required": false },
+    { "target": "supplier.id",    "path": "N1[SU].N1.3",             "transform": null,                "required": false },
+    {
+      "target": "lineItems",
+      "path": "PO1[]",
+      "type": "array",
+      "required": true,
+      "fields": [
+        { "target": "lineNumber",   "path": "PO1.0",   "transform": null,                "required": true },
+        { "target": "quantity",     "path": "PO1.1",   "transform": "toInt",             "required": true },
+        { "target": "uom",          "path": "PO1.2",   "transform": null,                "required": false },
+        { "target": "unitPrice",    "path": "PO1.3",   "transform": "toDecimal",         "required": true },
+        { "target": "vendorSku",    "path": "PO1[VN]", "transform": null,                "required": false },
+        { "target": "buyerSku",     "path": "PO1[BP]", "transform": null,                "required": false },
+        { "target": "description",  "path": "PID.PID.1","transform": null,               "required": false },
+        { "target": "needByDate",   "path": "PID.DTM[067].1","transform": "parseDate:yyyyMMdd","required": false },
+        {
+          "target": "schedule",
+          "path": "SCH[]",
+          "type": "array",
+          "fields": [
+            { "target": "qty",  "path": "SCH.0", "transform": "toInt",             "required": false },
+            { "target": "uom",  "path": "SCH.1", "transform": null,                "required": false },
+            { "target": "date", "path": "SCH.3", "transform": "parseDate:yyyyMMdd","required": false }
+          ]
+        },
+        {
+          "target": "charges",
+          "path": "SAC[]",
+          "type": "array",
+          "fields": [
+            { "target": "indicator", "path": "SAC.0", "transform": null, "required": false },
+            { "target": "code",      "path": "SAC.1", "transform": null, "required": false },
+            { "target": "amount",    "path": "SAC.2", "transform": "toDecimal", "required": false }
+          ]
+        }
+      ]
+    }
+  ]
+}
