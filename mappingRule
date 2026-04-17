@@ -1,0 +1,67 @@
+package com.pio.edi.document.mapping.domain;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.pio.edi.common.enums.Environment;
+import com.pio.edi.partner.domain.Partner;
+import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "mapping_rule",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"partner_id", "document_type", "version", "environment"}))
+public class MappingRule {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "partner_id", nullable = false)
+    private Partner partner;
+
+    @Column(nullable = false)
+    private String documentType;
+
+    @Column(nullable = false)
+    private Integer version;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Environment environment;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    private JsonNode ruleDefinition;
+
+    @Column(nullable = false)
+    private boolean active = false;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    protected MappingRule() {}
+
+    public MappingRule(Partner partner, String documentType, Integer version,
+                       Environment environment, JsonNode ruleDefinition) {
+        this.partner = partner;
+        this.documentType = documentType;
+        this.version = version;
+        this.environment = environment;
+        this.ruleDefinition = ruleDefinition;
+    }
+
+    public Long getId() { return id; }
+    public Partner getPartner() { return partner; }
+    public String getDocumentType() { return documentType; }
+    public Integer getVersion() { return version; }
+    public Environment getEnvironment() { return environment; }
+    public JsonNode getRuleDefinition() { return ruleDefinition; }
+    public boolean isActive() { return active; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public void setActive(boolean active) { this.active = active; }
+    public void setRuleDefinition(JsonNode ruleDefinition) { this.ruleDefinition = ruleDefinition; }
+}
