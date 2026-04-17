@@ -1,0 +1,205 @@
+package com.pio.edi.engine;
+
+import com.pio.edi.common.EdiNode;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+@Slf4j
+@Component
+public class EdiPathResolver {
+
+    /**
+     * Resolve a scalar path against an EdiNode (the ST-level node).
+     *
+     * Supported patterns:
+     *   BEG.2                → child BEG → elements[2]
+     *   DTM[010].1           → child DTM where elements[0]=="010" → elements[1]
+     *   REF[DP].1            → child REF where elements[0]=="DP"  → elements[1]
+     *   N1[BT].N3.0          → N1 group (qualifier BT) → child N3 → elements[0]
+     *   N1[BT].N1.1          → N1 group (qualifier BT) → inner N1 child → elements[1]
+     *   PO1[VN]              → inside PO1 group: paired-element lookup for qualifier VN
+     *   PID.PID.1            → child PID (group) → inner child PID → elements[1]
+     *   PID.DTM[067].1       → child PID (group) → child DTM where elements[0]=="067" → elements[1]
+     *   SCH.0                → child SCH (group) → inner SCH → elements[0]
+     */
+    public Optional<String> resolveScalar(EdiNode context, String path) {
+        if (path == null || path.isBlank()) return Optional.empty();
+        try {
+            return evaluate(context, path);
+        } catch (Exception e) {
+            log.warn("Path resolution failed [path={}]: {}", path, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Resolve an array path like "PO1[]" or "SCH[]".
+     * Returns a list of EdiNode group containers, each representing one loop iteration.
+     */
+    public List<EdiNode> resolveArray(EdiNode context, String path) {
+        if (path == null || !path.endsWith("[]")) return Collections.emptyList();
+        String segmentName = path.substring(0, path.length() - 2);
+        // collect all top-level children whose name matches (each is a loop group wrapper)
+        List<EdiNode> result = new ArrayList<>();
+        for (EdiNode child : context.getChildren()) {
+            if (child.getName().equals(segmentName)) {
+                result.add(child);
+            }
+        }
+        return result;
+    }
+
+    // ─── private evaluation logic ─────────────────────────────────────────────
+
+    private Optional<String> evaluate(EdiNode node, String path) {
+        // split only on first dot to get head and tail
+        int dotIdx = path.indexOf('.');
+        String head = dotIdx >= 0 ? path.substring(0, dotIdx) : path;
+        String tail = dotIdx >= 0 ? path.substring(dotIdx + 1) : null;
+
+        // ── N1[BT] group navigation ──────────────────────────────────────────
+        // Pattern: N1[QUALIFIER] — find the N1 group container whose inner N1
+        // child has elements[0] == qualifier
+        if (head.matches("N1\\[[A-Z]+\\]")) {
+            String qualifier = head.substring(3, head.length() - 1);
+            EdiNode n1Group = findN1Group(node, qualifier);
+            if (n1Group == null) return Optional.empty();
+            if (tail == null) return Optional.empty();
+            return evaluate(n1Group, tail);
+        }
+
+        // ── Qualified segment: DTM[010] or REF[DP] ───────────────────────────
+        // Pattern: SEGMENT[QUALIFIER].elementIndex
+        if (head.matches("[A-Z0-9]+\\[[A-Z0-9]+\\]")) {
+            int ob = head.indexOf('[');
+            String segName   = head.substring(0, ob);
+            String qualifier = head.substring(ob + 1, head.length() - 1);
+            Optional<EdiNode> seg = findChildByQualifier(node, segName, qualifier);
+            if (seg.isEmpty()) return Optional.empty();
+            if (tail == null) return Optional.empty();
+            return getElementByIndex(seg.get(), tail);
+        }
+
+        // ── Paired-element qualifier inside PO1 group: PO1[VN] ──────────────
+        // BerryWorks PO1 stores pairs: VN, XYZ-1001, BP, ACME-RED-01 in elements[4..N]
+        // elements[4]=VN elements[5]=XYZ-1001 elements[6]=BP elements[7]=ACME-RED-01
+        if (head.matches("PO1\\[[A-Z]+\\]")) {
+            String qualifier = head.substring(4, head.length() - 1);
+            // The actual data sits in the inner PO1 child (BerryWorks wraps it)
+            Optional<EdiNode> innerPo1 = node.findFirstChild("PO1");
+            return innerPo1.flatMap(p -> findPairedElement(p, qualifier));
+        }
+
+        // ── Plain segment with element index: BEG.2 ──────────────────────────
+        if (tail != null && tail.matches("\\d+")) {
+            Optional<EdiNode> child = findDirectOrWrapped(node, head);
+            return child.flatMap(c -> getElementByIndex(c, tail));
+        }
+
+        // ── Navigate deeper: PID.PID.1 or PID.DTM[067].1 ────────────────────
+        if (tail != null) {
+            Optional<EdiNode> child = findDirectOrWrapped(node, head);
+            return child.flatMap(c -> evaluate(c, tail));
+        }
+
+        // ── Plain segment, return elements[0] ────────────────────────────────
+        Optional<EdiNode> child = findDirectOrWrapped(node, head);
+        return child.flatMap(c -> c.getElements().isEmpty()
+                ? Optional.empty()
+                : Optional.ofNullable(c.getElements().get(0)));
+    }
+
+    /**
+     * Find a child directly, OR find it inside a same-named group wrapper.
+     * BerryWorks wraps e.g. PO1 group → children → PO1 (inner with elements).
+     * Also handles PID group → children → PID inner.
+     */
+    private Optional<EdiNode> findDirectOrWrapped(EdiNode node, String name) {
+        // Direct child with elements
+        for (EdiNode child : node.getChildren()) {
+            if (child.getName().equals(name) && !child.getElements().isEmpty()) {
+                return Optional.of(child);
+            }
+        }
+        // Group wrapper: child named X that contains a child also named X with elements
+        for (EdiNode child : node.getChildren()) {
+            if (child.getName().equals(name)) {
+                Optional<EdiNode> inner = child.findFirstChild(name);
+                if (inner.isPresent() && !inner.get().getElements().isEmpty()) {
+                    return inner;
+                }
+                // Group wrapper with different named children (e.g. PID group → PID inner, DTM)
+                return Optional.of(child);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Find N1 group container where the inner N1 child's elements[0] == qualifier.
+     * BerryWorks structure: outer N1 (no elements) → children → inner N1 (elements[0]=BT/ST/SU)
+     */
+    private EdiNode findN1Group(EdiNode node, String qualifier) {
+        for (EdiNode child : node.getChildren()) {
+            if (!child.getName().equals("N1")) continue;
+            // Check if this N1 group's inner N1 child matches qualifier
+            Optional<EdiNode> innerN1 = child.findFirstChild("N1");
+            if (innerN1.isPresent()
+                    && !innerN1.get().getElements().isEmpty()
+                    && qualifier.equals(innerN1.get().getElements().get(0))) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find child segment where elements[0] == qualifier.
+     * Used for DTM[010], REF[DP] etc.
+     */
+    private Optional<EdiNode> findChildByQualifier(EdiNode node, String segName, String qualifier) {
+        for (EdiNode child : node.getChildren()) {
+            if (!child.getName().equals(segName)) continue;
+            if (!child.getElements().isEmpty()
+                    && qualifier.equals(child.getElements().get(0))) {
+                return Optional.of(child);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * BerryWorks PO1 paired elements layout:
+     *   elements[0]=lineNum, [1]=qty, [2]=uom, [3]=price, [4]=priceQual,
+     *   [5]=idQual1, [6]=id1, [7]=idQual2, [8]=id2, ...
+     * So qualifier "VN" at index 5 → value at index 6.
+     */
+    private Optional<String> findPairedElement(EdiNode po1, String qualifier) {
+        List<String> elems = po1.getElements();
+        for (int i = 4; i < elems.size() - 1; i += 2) {
+            if (qualifier.equals(elems.get(i))) {
+                return Optional.ofNullable(elems.get(i + 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> getElementByIndex(EdiNode node, String indexStr) {
+        try {
+            int idx = Integer.parseInt(indexStr);
+            List<String> elems = node.getElements();
+            if (idx < elems.size()) {
+                String val = elems.get(idx);
+                return val != null && !val.isBlank() ? Optional.of(val.trim()) : Optional.empty();
+            }
+        } catch (NumberFormatException e) {
+            log.warn("Invalid element index '{}' on segment '{}'", indexStr, node.getName());
+        }
+        return Optional.empty();
+    }
+}
