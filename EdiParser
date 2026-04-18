@@ -1,0 +1,52 @@
+package com.pio.edi.document.handling.parser;
+
+import com.berryworks.edireader.EDIReaderFactory;
+import com.pio.edi.document.handling.dto.EdiNode;
+import com.pio.edi.document.handling.service.EdiTreeBuilder;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.xml.sax.InputSource;
+import org.xml.sax.XMLReader;
+
+import java.io.StringReader;
+
+@Component
+@RequiredArgsConstructor
+public class EdiParser {
+
+    private final EdiTreeBuilder handler;
+
+    public EdiNode parse(String ediPayload) {
+
+        if (ediPayload == null || ediPayload.isBlank()) {
+            throw new IllegalArgumentException("EDI input cannot be null or empty");
+        }
+
+        try {
+
+
+            InputSource inputSource = new InputSource(new StringReader(ediPayload));
+
+            XMLReader reader = EDIReaderFactory.createEDIReader(inputSource);
+
+            reader.setContentHandler(handler);
+            reader.parse(inputSource);
+
+            return handler.getRoot();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse EDI", e);
+        }
+    }
+
+    /**
+     * Determines document type from raw payload.
+     */
+    public String detectDocumentType(String rawPayload) {
+        if (rawPayload == null) return "UNKNOWN";
+        if (rawPayload.contains("850") || rawPayload.contains("PO")) return "850";
+        if (rawPayload.contains("810") || rawPayload.contains("INV")) return "810";
+        if (rawPayload.contains("856") || rawPayload.contains("ASN")) return "856";
+        if (rawPayload.contains("855")) return "855";
+        return "UNKNOWN";
+    }
+}
