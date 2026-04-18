@@ -1,0 +1,26 @@
+package com.pio.edi.engine;
+
+import org.springframework.stereotype.Component;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Component
+public class OutputBuilder {
+
+    /**
+     * Set a value at a dot-notation path inside a Map tree.
+     * "buyer.city" → output["buyer"]["city"] = value
+     * "poNumber"   → output["poNumber"] = value
+     */
+    @SuppressWarnings("unchecked")
+    public void set(Map<String, Object> output, String dotPath, Object value) {
+        if (value == null) return;
+        String[] keys = dotPath.split("\\.", 2);
+        if (keys.length == 1) {
+            output.put(keys[0], value);
+        } else {
+            output.computeIfAbsent(keys[0], k -> new LinkedHashMap<String, Object>());
+            set((Map<String, Object>) output.get(keys[0]), keys[1], value);
+        }
+    }
+}
