@@ -1,0 +1,159 @@
+package com.pio.edi.document.handling.service;
+
+import com.pio.edi.document.handling.dto.EdiNode;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Service;
+import org.xml.sax.Attributes;
+import org.xml.sax.helpers.DefaultHandler;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+@Service
+@Scope("prototype")
+public class EdiTreeBuilder extends DefaultHandler {
+
+    private final Deque<EdiNode> stack = new ArrayDeque<>();
+    private final StringBuilder textBuffer = new StringBuilder();
+
+    private EdiNode root;
+    private EdiNode currentSegment;
+
+    public EdiNode getRoot() {
+        return root;
+    }
+
+    @Override
+    public void startDocument() {
+        root = new EdiNode("EDI_DOCUMENT");
+        stack.clear();
+        stack.push(root);
+        currentSegment = null;
+        textBuffer.setLength(0);
+    }
+
+    @Override
+    public void startElement(
+            String uri,
+            String localName,
+            String qName,
+            Attributes attributes) {
+
+        textBuffer.setLength(0);
+        EdiNode node = null;
+
+        /* ===========================
+           Interchange / Group / Transaction
+           =========================== */
+
+        if ("interchange".equals(qName)) {
+            node = new EdiNode("ISA");
+            copyAttributes(attributes, node);
+            attach(node);
+            return;
+        }
+
+        if ("group".equals(qName)) {
+            node = new EdiNode("GS");
+            copyAttributes(attributes, node);
+            attach(node);
+            return;
+        }
+
+        if ("transaction".equals(qName)) {
+            node = new EdiNode("ST");
+            copyAttributes(attributes, node);
+            attach(node);
+            return;
+        }
+
+        /* ===========================
+           LOOP
+           =========================== */
+        if ("loop".equals(qName)) {
+            String loopName = attributes.getValue("name");
+            if (loopName == null) {
+                loopName = attributes.getValue(0); // fallback
+            }
+            node = new EdiNode(loopName != null ? loopName : "LOOP");
+            attach(node);
+            return;
+        }
+
+        /* ===========================
+           SEGMENT
+           =========================== */
+        if ("segment".equals(qName)) {
+            String segmentName = attributes.getValue("name");
+            if (segmentName == null) {
+                segmentName = attributes.getValue(0); // fallback
+            }
+            node = new EdiNode(segmentName != null ? segmentName : "SEGMENT");
+            currentSegment = node;
+            attach(node);
+        }
+    }
+
+    @Override
+    public void characters(char[] ch, int start, int length) {
+        textBuffer.append(ch, start, length);
+    }
+
+    @Override
+    public void endElement(String uri, String localName, String qName) {
+
+        String value = textBuffer.toString().trim();
+
+        /* ===========================
+           ELEMENT (MOST IMPORTANT FIX)
+           =========================== */
+        if ("element".equals(qName) && currentSegment != null) {
+            // ✅ ADD EVEN EMPTY ELEMENTS
+            currentSegment.addElement(value);
+        }
+
+        /* ===========================
+           SEGMENT END
+           =========================== */
+        if ("segment".equals(qName)) {
+            stack.pop();          // close segment
+            currentSegment = null;
+            textBuffer.setLength(0);
+            return;
+        }
+
+        /* ===========================
+           LOOP END
+           =========================== */
+        if ("loop".equals(qName)) {
+            stack.pop();
+            textBuffer.setLength(0);
+            return;
+        }
+
+        /* ===========================
+           STRUCTURAL CLOSES
+           =========================== */
+        if ("transaction".equals(qName)
+                || "group".equals(qName)
+                || "interchange".equals(qName)) {
+            stack.pop();
+            textBuffer.setLength(0);
+        }
+    }
+
+    /* ===========================
+       Utilities
+       =========================== */
+
+    private void attach(EdiNode node) {
+        stack.peek().addChild(node);
+        stack.push(node);
+    }
+
+    private void copyAttributes(Attributes attrs, EdiNode node) {
+        for (int i = 0; i < attrs.getLength(); i++) {
+            node.addAttribute(attrs.getQName(i), attrs.getValue(i));
+        }
+    }
+}
