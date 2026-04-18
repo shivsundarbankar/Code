@@ -1,0 +1,61 @@
+package com.pio.edi.engine;
+
+import com.pio.edi.engine.exception.MappingException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+@Slf4j
+@Component
+public class TransformEngine {
+
+    /**
+     * Apply a transform to a raw string value resolved from the EDI tree.
+     *
+     * Supported transforms:
+     *   trim                 → strip whitespace
+     *   toInt                → Integer
+     *   toDecimal            → BigDecimal
+     *   toUpperCase          → uppercase string
+     *   toLowerCase          → lowercase string
+     *   parseDate:yyyyMMdd   → LocalDate → ISO string "yyyy-MM-dd"
+     *   parseDate:MMddyyyy   → same, different input format
+     */
+    public Object apply(String rawValue, String transform) {
+        if (rawValue == null || rawValue.isBlank()) return null;
+        if (transform == null || transform.isBlank()) return rawValue.trim();
+
+        String val = rawValue.trim();
+        String[] parts = transform.split(":", 2);
+        String fn = parts[0].trim();
+        String arg = parts.length > 1 ? parts[1].trim() : null;
+
+        try {
+            return switch (fn) {
+                case "trim"        -> val;
+                case "toInt"       -> Integer.parseInt(val);
+                case "toLong"      -> Long.parseLong(val);
+                case "toDecimal"   -> new BigDecimal(val);
+                case "toBoolean"   -> Boolean.parseBoolean(val);
+                case "toUpperCase" -> val.toUpperCase();
+                case "toLowerCase" -> val.toLowerCase();
+                case "parseDate"   -> parseDate(val, arg);
+                default -> {
+                    log.warn("Unknown transform '{}', returning raw value", fn);
+                    yield val;
+                }
+            };
+        } catch (Exception e) {
+            throw new MappingException(
+                "Transform '%s' failed on value '%s': %s".formatted(transform, val, e.getMessage()));
+        }
+    }
+
+    private String parseDate(String value, String pattern) {
+        String fmt = (pattern != null && !pattern.isBlank()) ? pattern : "yyyyMMdd";
+        return LocalDate.parse(value, DateTimeFormatter.ofPattern(fmt)).toString();
+    }
+}
