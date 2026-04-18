@@ -1,0 +1,8 @@
+data": {
+    "_mappingErrors": [
+      "Required field 'poNumber' (path: BEG.2) not found",
+      "Required field 'orderDate' (path: DTM[010].1) not found",
+      "Required field 'buyer.name' (path: N1[BT].N1.1) not found",
+      "Field 'lineItems': Required array 'lineItems' (path: PO1[]) resolved to empty"
+    ]
+  },
