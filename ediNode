@@ -1,5 +1,8 @@
 package com.pio.edi.document.handling.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.util.*;
@@ -10,7 +13,9 @@ public class EdiNode {
     private final String name;
 
     private final List<String> elements;
+
     private final List<EdiNode> children;
+
     private final Map<String, Object> attributes;
 
     public EdiNode(String name) {
@@ -20,8 +25,9 @@ public class EdiNode {
         this.attributes = new HashMap<>();
     }
 
+    // ✅ DO NOT filter empties
     public void addElement(String value) {
-        elements.add(value);
+        elements.add(value == null ? "" : value);
     }
 
     public void addChild(EdiNode node) {
@@ -33,7 +39,6 @@ public class EdiNode {
         attributes.put(key, value);
     }
 
-    //Optional helper
     public Optional<Object> getAttribute(String key) {
         return Optional.ofNullable(attributes.get(key));
     }
@@ -42,5 +47,15 @@ public class EdiNode {
         return children.stream()
                 .filter(c -> c.getName().equals(name))
                 .findFirst();
+    }
+
+    // ✅ OPTIONAL but VERY helpful for EDI
+    // 1‑based element access (X12 standard)
+    public String getElement(int position) {
+        int index = position - 1;
+        if (index < 0 || index >= elements.size()) {
+            return "";
+        }
+        return elements.get(index);
     }
 }
