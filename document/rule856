@@ -1,0 +1,65 @@
+{
+  "outputSchema": "AdvanceShipNotice",
+  "fields": [
+    { "target": "shipmentId",     "path": "BSN.1", "transform": "trim",               "required": true  },
+    { "target": "shipDate",       "path": "BSN.2", "transform": "parseDate:yyyyMMdd", "required": true  },
+    { "target": "shipTime",       "path": "BSN.3", "transform": null,                 "required": false },
+    { "target": "shipmentPurpose","path": "BSN.0", "transform": null,                 "required": false },
+    { "target": "actualShipDate", "path": "DTM[011].1", "transform": "parseDate:yyyyMMdd", "required": false },
+    { "target": "carrier.scac",   "path": "TD5.2", "transform": null,                 "required": false },
+    { "target": "carrier.name",   "path": "TD5.4", "transform": null,                 "required": false },
+    { "target": "bolNumber",      "path": "REF[BM].1", "transform": "trim",           "required": false },
+    { "target": "proNumber",      "path": "REF[CN].1", "transform": "trim",           "required": false },
+    { "target": "totalLineItems", "path": "CTT.CTT.0", "transform": "toInt",          "required": false },
+    { "target": "totalQuantity",  "path": "CTT.CTT.1", "transform": "toInt",          "required": false },
+
+    {
+      "target": "hlLoops",
+      "path": "HL[]",
+      "type": "array",
+      "required": true,
+      "fields": [
+        { "target": "hlId",        "path": "HL.0", "transform": null, "required": false },
+        { "target": "hlParentId",  "path": "HL.1", "transform": null, "required": false },
+        { "target": "hlLevelCode", "path": "HL.2", "transform": null, "required": false },
+
+        { "target": "packaging.packageType",  "path": "TD1.0", "transform": null,        "required": false },
+        { "target": "packaging.totalCartons", "path": "TD1.1", "transform": "toInt",     "required": false },
+        { "target": "packaging.grossWeight",  "path": "TD1.6", "transform": "toDecimal", "required": false },
+        { "target": "packaging.weightUom",    "path": "TD1.7", "transform": null,        "required": false },
+
+        { "target": "shipFrom.name",   "path": "N1[SF].N1.1", "transform": null, "required": false },
+        { "target": "shipFrom.id",     "path": "N1[SF].N1.3", "transform": null, "required": false },
+        { "target": "shipFrom.street", "path": "N1[SF].N3.0", "transform": null, "required": false },
+        { "target": "shipFrom.city",   "path": "N1[SF].N4.0", "transform": null, "required": false },
+        { "target": "shipFrom.state",  "path": "N1[SF].N4.1", "transform": null, "required": false },
+        { "target": "shipFrom.zip",    "path": "N1[SF].N4.2", "transform": null, "required": false },
+
+        { "target": "shipTo.name",   "path": "N1[ST].N1.1", "transform": null, "required": false },
+        { "target": "shipTo.id",     "path": "N1[ST].N1.3", "transform": null, "required": false },
+        { "target": "shipTo.street", "path": "N1[ST].N3.0", "transform": null, "required": false },
+        { "target": "shipTo.city",   "path": "N1[ST].N4.0", "transform": null, "required": false },
+        { "target": "shipTo.state",  "path": "N1[ST].N4.1", "transform": null, "required": false },
+        { "target": "shipTo.zip",    "path": "N1[ST].N4.2", "transform": null, "required": false },
+
+        { "target": "poNumber",         "path": "PRF.0",      "transform": "trim",               "required": false },
+        { "target": "poDate",           "path": "PRF.3",      "transform": "parseDate:yyyyMMdd", "required": false },
+        { "target": "internalAccount",  "path": "REF[IA].1",  "transform": null,                 "required": false },
+
+        { "target": "ssccLabel",          "path": "MAN.1",  "transform": "trim",      "required": false },
+        { "target": "pack.innerPacks",    "path": "PO4.0",  "transform": "toInt",     "required": false },
+        { "target": "pack.packUom",       "path": "PO4.2",  "transform": null,        "required": false },
+        { "target": "pack.grossWeight",   "path": "PO4.8",  "transform": "toDecimal", "required": false },
+        { "target": "pack.weightUom",     "path": "PO4.9",  "transform": null,        "required": false },
+
+        { "target": "item.lineNumber",  "path": "LIN.LIN.0",    "transform": null,    "required": false },
+        { "target": "item.vendorSku",   "path": "LIN.LIN[VN]",  "transform": null,    "required": false },
+        { "target": "item.buyerSku",    "path": "LIN.LIN[BP]",  "transform": null,    "required": false },
+        { "target": "item.upc",         "path": "LIN.LIN[UP]",  "transform": null,    "required": false },
+        { "target": "item.qtyShipped",  "path": "SN1.1",        "transform": "toInt", "required": false },
+        { "target": "item.uom",         "path": "SN1.2",        "transform": null,    "required": false },
+        { "target": "item.description", "path": "PID.PID.4",    "transform": null,    "required": false }
+      ]
+    }
+  ]
+}
