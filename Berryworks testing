@@ -1,0 +1,35 @@
+/**
+ * TEMPORARY DEBUG ONLY — prints raw XML that BerryWorks produces
+ * before SAX handler processes it.
+ * Remove before production.
+ */
+public String dumpRawXml(String ediPayload) {
+    try {
+        InputSource inputSource = new InputSource(new StringReader(ediPayload));
+        XMLReader reader = EDIReaderFactory.createEDIReader(inputSource);
+
+        // Use TransformerHandler to capture raw XML output
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer transformer = tf.newTransformer();
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+        transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+
+        StringWriter xmlOutput = new StringWriter();
+        SAXResult result = new SAXResult();
+
+        // Pipe SAX events → XML string
+        javax.xml.transform.sax.SAXTransformerFactory stf =
+                (javax.xml.transform.sax.SAXTransformerFactory) tf;
+        javax.xml.transform.sax.TransformerHandler th = stf.newTransformerHandler();
+        th.setResult(new javax.xml.transform.stream.StreamResult(xmlOutput));
+        reader.setContentHandler(th);
+
+        InputSource inputSource2 = new InputSource(new StringReader(ediPayload));
+        reader.parse(inputSource2);
+
+        return xmlOutput.toString();
+
+    } catch (Exception e) {
+        throw new RuntimeException("Failed to dump XML: " + e.getMessage(), e);
+    }
+}
