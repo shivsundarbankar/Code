@@ -1,35 +1,89 @@
 package com.pio.edi.document.handling.service;
 
 import com.pio.edi.document.handling.dto.EdiNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+/**
+ * SAX ContentHandler that builds an EdiNode tree from BerryWorks EDIReader XML output.
+ *
+ * BerryWorks XML structure:
+ *   <interchange ...>
+ *     <group ...>
+ *       <transaction ...>
+ *         <loop name="N1_Loop">
+ *           <segment name="N1">
+ *             <element sequence="1">BT</element>
+ *             <element sequence="2">ACME RETAIL INC.</element>
+ *           </segment>
+ *         </loop>
+ *         <segment name="PRF">
+ *           <element sequence="1">PO-123</element>
+ *           <element sequence="4">20260418</element>   ← sequence gaps must be padded
+ *         </segment>
+ *       </transaction>
+ *     </group>
+ *   </interchange>
+ *
+ * Key fixes over original:
+ *   1. sequence attribute on <element> is used to pad skipped positions with ""
+ *      so PRF*PO-123***20260418 → elements=[PO-123, "", "", 20260418] not [PO-123, 20260418]
+ *   2. currentSegment is reset correctly on segment close
+ *   3. textBuffer is cleared on startElement not endElement to avoid bleed-over
+ *   4. startDocument resets ALL state — safe for @Scope("prototype") reuse
+ *   5. errorHandler logs SAX warnings/errors without swallowing them
+ */
+@Slf4j
 @Service
 @Scope("prototype")
 public class EdiTreeBuilder extends DefaultHandler {
 
-    private final Deque<EdiNode> stack = new ArrayDeque<>();
-    private final StringBuilder textBuffer = new StringBuilder();
+    // ── state ─────────────────────────────────────────────────────────────────
+
+    private final Deque<EdiNode> stack       = new ArrayDeque<>();
+    private final StringBuilder  textBuffer  = new StringBuilder();
 
     private EdiNode root;
     private EdiNode currentSegment;
+
+    /**
+     * Tracks the NEXT expected 0-based index in the current segment's elements list.
+     * Used to detect gaps when BerryWorks skips empty trailing elements.
+     */
+    private int expectedElementIndex = 0;
+
+    /**
+     * The sequence number (1-based) read from <element sequence="N"> attribute.
+     * -1 means no sequence attribute was present on this element tag.
+     */
+    private int pendingSequence = -1;
+
+    // ── public API ────────────────────────────────────────────────────────────
 
     public EdiNode getRoot() {
         return root;
     }
 
+    // ── SAX lifecycle ─────────────────────────────────────────────────────────
+
     @Override
     public void startDocument() {
+        // Full reset — critical because Spring prototype beans may be reused
         root = new EdiNode("EDI_DOCUMENT");
         stack.clear();
         stack.push(root);
-        currentSegment = null;
+        currentSegment       = null;
+        expectedElementIndex = 0;
+        pendingSequence      = -1;
         textBuffer.setLength(0);
+        log.debug("EdiTreeBuilder startDocument — tree reset");
     }
 
     @Override
@@ -39,58 +93,86 @@ public class EdiTreeBuilder extends DefaultHandler {
             String qName,
             Attributes attributes) {
 
+        // Always clear buffer at START of element so we don't carry over
+        // whitespace from previous text nodes
         textBuffer.setLength(0);
-        EdiNode node = null;
 
-        /* ===========================
-           Interchange / Group / Transaction
-           =========================== */
+        switch (qName) {
 
-        if ("interchange".equals(qName)) {
-            node = new EdiNode("ISA");
-            copyAttributes(attributes, node);
-            attach(node);
-            return;
-        }
-
-        if ("group".equals(qName)) {
-            node = new EdiNode("GS");
-            copyAttributes(attributes, node);
-            attach(node);
-            return;
-        }
-
-        if ("transaction".equals(qName)) {
-            node = new EdiNode("ST");
-            copyAttributes(attributes, node);
-            attach(node);
-            return;
-        }
-
-        /* ===========================
-           LOOP
-           =========================== */
-        if ("loop".equals(qName)) {
-            String loopName = attributes.getValue("name");
-            if (loopName == null) {
-                loopName = attributes.getValue(0); // fallback
+            // ── envelope wrappers ─────────────────────────────────────────────
+            case "interchange" -> {
+                EdiNode node = new EdiNode("ISA");
+                copyAttributes(attributes, node);
+                attach(node);
             }
-            node = new EdiNode(loopName != null ? loopName : "LOOP");
-            attach(node);
-            return;
-        }
 
-        /* ===========================
-           SEGMENT
-           =========================== */
-        if ("segment".equals(qName)) {
-            String segmentName = attributes.getValue("name");
-            if (segmentName == null) {
-                segmentName = attributes.getValue(0); // fallback
+            case "group" -> {
+                EdiNode node = new EdiNode("GS");
+                copyAttributes(attributes, node);
+                attach(node);
             }
-            node = new EdiNode(segmentName != null ? segmentName : "SEGMENT");
-            currentSegment = node;
-            attach(node);
+
+            case "transaction" -> {
+                EdiNode node = new EdiNode("ST");
+                copyAttributes(attributes, node);
+                attach(node);
+            }
+
+            // ── loop wrapper ──────────────────────────────────────────────────
+            // BerryWorks wraps N1, PO1, HL etc. in <loop name="N1_Loop"> or
+            // <loop name="N1"> depending on the schema. We use the loop name
+            // as the EdiNode name so path expressions like "N1[]" still work.
+            case "loop" -> {
+                String loopName = attributes.getValue("name");
+                if (loopName == null || loopName.isBlank()) {
+                    loopName = attributes.getValue(0); // positional fallback
+                }
+                // Strip trailing loop suffixes BerryWorks sometimes adds e.g. "N1_Loop" → "N1"
+                // Only strip if the base name is a known EDI segment name pattern
+                if (loopName != null && loopName.contains("_")) {
+                    String stripped = loopName.substring(0, loopName.indexOf('_'));
+                    if (stripped.matches("[A-Z][A-Z0-9]{1,2}")) {
+                        loopName = stripped;
+                    }
+                }
+                EdiNode node = new EdiNode(loopName != null ? loopName : "LOOP");
+                attach(node);
+            }
+
+            // ── segment ───────────────────────────────────────────────────────
+            case "segment" -> {
+                String segName = attributes.getValue("name");
+                if (segName == null || segName.isBlank()) {
+                    segName = attributes.getValue(0);
+                }
+                EdiNode node = new EdiNode(segName != null ? segName : "SEGMENT");
+                currentSegment       = node;
+                expectedElementIndex = 0;   // reset position counter for this segment
+                attach(node);
+            }
+
+            // ── element — capture sequence attribute before characters() ──────
+            case "element" -> {
+                if (currentSegment != null) {
+                    String seqAttr = attributes.getValue("sequence");
+                    if (seqAttr != null && !seqAttr.isBlank()) {
+                        try {
+                            pendingSequence = Integer.parseInt(seqAttr.trim());
+                        } catch (NumberFormatException e) {
+                            log.warn("Non-numeric sequence attribute '{}' on element in segment [{}]",
+                                    seqAttr, currentSegment.getName());
+                            pendingSequence = -1;
+                        }
+                    } else {
+                        pendingSequence = -1; // no sequence — append in order
+                    }
+                }
+            }
+
+            default -> {
+                // unknown tag — ignore, do not push to stack
+                log.trace("Unrecognised element: <{}>", qName);
+            }
         }
     }
 
@@ -102,49 +184,107 @@ public class EdiTreeBuilder extends DefaultHandler {
     @Override
     public void endElement(String uri, String localName, String qName) {
 
-        String value = textBuffer.toString().trim();
+        switch (qName) {
 
-        /* ===========================
-           ELEMENT (MOST IMPORTANT FIX)
-           =========================== */
-        if ("element".equals(qName) && currentSegment != null) {
-            // ✅ ADD EVEN EMPTY ELEMENTS
-            currentSegment.addElement(value);
-        }
+            // ── element value ─────────────────────────────────────────────────
+            case "element" -> {
+                if (currentSegment == null) return;
 
-        /* ===========================
-           SEGMENT END
-           =========================== */
-        if ("segment".equals(qName)) {
-            stack.pop();          // close segment
-            currentSegment = null;
-            textBuffer.setLength(0);
-            return;
-        }
+                String value = textBuffer.toString().trim();
+                textBuffer.setLength(0);
 
-        /* ===========================
-           LOOP END
-           =========================== */
-        if ("loop".equals(qName)) {
-            stack.pop();
-            textBuffer.setLength(0);
-            return;
-        }
+                if (pendingSequence > 0) {
+                    // Convert 1-based sequence to 0-based target index
+                    int targetIndex = pendingSequence - 1;
 
-        /* ===========================
-           STRUCTURAL CLOSES
-           =========================== */
-        if ("transaction".equals(qName)
-                || "group".equals(qName)
-                || "interchange".equals(qName)) {
-            stack.pop();
-            textBuffer.setLength(0);
+                    // Pad any skipped positions with "" to maintain correct indexing.
+                    // Example: PRF*PO-123***20260418 → sequence 1 and 4 are emitted.
+                    // We pad indices 1 and 2 with "" before writing index 3.
+                    while (currentSegment.getElements().size() < targetIndex) {
+                        currentSegment.addElement("");
+                        log.trace("Padded empty element at index {} in segment [{}]",
+                                currentSegment.getElements().size() - 1,
+                                currentSegment.getName());
+                    }
+
+                    currentSegment.addElement(value);
+                    expectedElementIndex = targetIndex + 1;
+
+                } else {
+                    // No sequence attribute — just append in arrival order
+                    currentSegment.addElement(value);
+                    expectedElementIndex++;
+                }
+
+                pendingSequence = -1;
+            }
+
+            // ── segment close ─────────────────────────────────────────────────
+            case "segment" -> {
+                if (log.isDebugEnabled() && currentSegment != null) {
+                    log.debug("Segment [{}] elements={}",
+                            currentSegment.getName(),
+                            currentSegment.getElements());
+                }
+                stack.pop();
+                currentSegment       = null;
+                expectedElementIndex = 0;
+                pendingSequence      = -1;
+                textBuffer.setLength(0);
+            }
+
+            // ── loop close ────────────────────────────────────────────────────
+            case "loop" -> {
+                stack.pop();
+                textBuffer.setLength(0);
+            }
+
+            // ── envelope closes ───────────────────────────────────────────────
+            case "transaction", "group", "interchange" -> {
+                stack.pop();
+                textBuffer.setLength(0);
+            }
+
+            default -> {
+                // unknown closing tag — ignore
+            }
         }
     }
 
-    /* ===========================
-       Utilities
-       =========================== */
+    @Override
+    public void endDocument() {
+        if (stack.size() != 1) {
+            log.warn("EdiTreeBuilder endDocument: stack size is {} (expected 1) — " +
+                     "possible malformed EDI input", stack.size());
+        } else {
+            log.debug("EdiTreeBuilder endDocument — tree complete. Root children: {}",
+                    root.getChildren().size());
+        }
+    }
+
+    // ── SAX error handling ────────────────────────────────────────────────────
+
+    @Override
+    public void warning(org.xml.sax.SAXParseException e) {
+        log.warn("SAX warning at line {}, col {}: {}",
+                e.getLineNumber(), e.getColumnNumber(), e.getMessage());
+    }
+
+    @Override
+    public void error(org.xml.sax.SAXParseException e) throws SAXException {
+        log.error("SAX error at line {}, col {}: {}",
+                e.getLineNumber(), e.getColumnNumber(), e.getMessage());
+        throw e; // re-throw so EdiParser catches it as RuntimeException
+    }
+
+    @Override
+    public void fatalError(org.xml.sax.SAXParseException e) throws SAXException {
+        log.error("SAX fatal error at line {}, col {}: {}",
+                e.getLineNumber(), e.getColumnNumber(), e.getMessage());
+        throw e;
+    }
+
+    // ── utilities ─────────────────────────────────────────────────────────────
 
     private void attach(EdiNode node) {
         stack.peek().addChild(node);
