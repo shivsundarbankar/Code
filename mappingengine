@@ -1,0 +1,129 @@
+package com.pio.edi.engine;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pio.edi.common.EdiNode;
+import com.pio.edi.engine.exception.MappingException;
+import com.pio.edi.engine.exception.MissingRequiredFieldException;
+import com.pio.edi.engine.model.FieldMappingDefinition;
+import com.pio.edi.engine.model.RuleDefinition;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MappingEngine {
+
+    private final EdiPathResolver  pathResolver;
+    private final TransformEngine  transformEngine;
+    private final OutputBuilder    outputBuilder;
+    private final ObjectMapper     objectMapper;
+
+    /**
+     * Main entry point.
+     *
+     * @param stNode         the ST-level EdiNode (EDI_DOCUMENT → ISA → GS → ST)
+     * @param ruleDefinition the JsonNode stored in MappingRule.ruleDefinition
+     * @return               business JSON as Map ready for serialization
+     */
+    public Map<String, Object> map(EdiNode stNode, JsonNode ruleDefinition) {
+        RuleDefinition rule = parseRule(ruleDefinition);
+        Map<String, Object> output = new LinkedHashMap<>();
+        List<String> errors = new ArrayList<>();
+
+        for (FieldMappingDefinition field : rule.getFields()) {
+            try {
+                if (field.isArray()) {
+                    processArray(stNode, field, output);
+                } else {
+                    processScalar(stNode, field, output, errors);
+                }
+            } catch (MappingException e) {
+                errors.add("Field '%s': %s".formatted(field.getTarget(), e.getMessage()));
+                log.error("Mapping error on field [{}]: {}", field.getTarget(), e.getMessage());
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            log.warn("Mapping completed with {} error(s): {}", errors.size(), errors);
+            output.put("_mappingErrors", errors);
+        }
+
+        return output;
+    }
+
+    // ─── scalar field ─────────────────────────────────────────────────────────
+
+    private void processScalar(EdiNode context,
+                               FieldMappingDefinition field,
+                               Map<String, Object> output,
+                               List<String> errors) {
+        Optional<String> raw = pathResolver.resolveScalar(context, field.getPath());
+
+        if (raw.isEmpty() || raw.get().isBlank()) {
+            if (field.isRequired()) {
+                errors.add("Required field '%s' (path: %s) not found"
+                        .formatted(field.getTarget(), field.getPath()));
+            }
+            return;
+        }
+
+        Object value = transformEngine.apply(raw.get(), field.getTransform());
+        outputBuilder.set(output, field.getTarget(), value);
+        log.debug("Mapped [{}] = '{}' from path [{}]", field.getTarget(), value, field.getPath());
+    }
+
+    // ─── array field ──────────────────────────────────────────────────────────
+
+    private void processArray(EdiNode context,
+                              FieldMappingDefinition arrayField,
+                              Map<String, Object> output) {
+        List<EdiNode> groupNodes = pathResolver.resolveArray(context, arrayField.getPath());
+
+        if (groupNodes.isEmpty()) {
+            if (arrayField.isRequired()) {
+                throw new MappingException(
+                    "Required array '%s' (path: %s) resolved to empty"
+                        .formatted(arrayField.getTarget(), arrayField.getPath()));
+            }
+            return;
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+
+        for (EdiNode groupNode : groupNodes) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            List<String> itemErrors = new ArrayList<>();
+
+            for (FieldMappingDefinition childField : arrayField.getFields()) {
+                if (childField.isArray()) {
+                    // nested array e.g. schedule[], charges[] inside PO1
+                    processArray(groupNode, childField, item);
+                } else {
+                    processScalar(groupNode, childField, item, itemErrors);
+                }
+            }
+
+            if (!itemErrors.isEmpty()) {
+                item.put("_errors", itemErrors);
+            }
+            items.add(item);
+        }
+
+        outputBuilder.set(output, arrayField.getTarget(), items);
+    }
+
+    // ─── rule parsing ─────────────────────────────────────────────────────────
+
+    private RuleDefinition parseRule(JsonNode ruleDefinition) {
+        try {
+            return objectMapper.treeToValue(ruleDefinition, RuleDefinition.class);
+        } catch (Exception e) {
+            throw new MappingException("Failed to parse ruleDefinition: " + e.getMessage());
+        }
+    }
+}
