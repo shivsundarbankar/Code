@@ -1,0 +1,57 @@
+{
+  "outputSchema": "Invoice",
+  "fields": [
+
+    { "target": "invoiceNumber", "path": "BIG.1", "transform": "trim",               "required": true  },
+    { "target": "invoiceDate",   "path": "BIG.0", "transform": "parseDate:yyyyMMdd", "required": true  },
+    { "target": "poNumber",      "path": "BIG.3", "transform": "trim",               "required": true  },
+    { "target": "poDate",        "path": "BIG.2", "transform": "parseDate:yyyyMMdd", "required": false },
+
+    { "target": "currencyCode",  "path": "CUR.1", "transform": null,   "required": false },
+    { "target": "termsType",     "path": "ITD.0", "transform": null,   "required": false },
+    { "target": "netDays",       "path": "ITD.3", "transform": "toInt","required": false },
+    { "target": "dueDate",       "path": "DTM[003].1", "transform": "parseDate:yyyyMMdd", "required": false },
+
+    { "target": "vendor.name",   "path": "N1[SE].N1.1", "transform": null, "required": true  },
+    { "target": "vendor.id",     "path": "N1[SE].N1.3", "transform": null, "required": false },
+    { "target": "vendor.street", "path": "N1[SE].N3.0", "transform": null, "required": false },
+    { "target": "vendor.city",   "path": "N1[SE].N4.0", "transform": null, "required": false },
+    { "target": "vendor.state",  "path": "N1[SE].N4.1", "transform": null, "required": false },
+    { "target": "vendor.zip",    "path": "N1[SE].N4.2", "transform": null, "required": false },
+
+    { "target": "billTo.name",   "path": "N1[BT].N1.1", "transform": null, "required": true  },
+    { "target": "billTo.id",     "path": "N1[BT].N1.3", "transform": null, "required": false },
+    { "target": "billTo.street", "path": "N1[BT].N3.0", "transform": null, "required": false },
+    { "target": "billTo.city",   "path": "N1[BT].N4.0", "transform": null, "required": false },
+    { "target": "billTo.state",  "path": "N1[BT].N4.1", "transform": null, "required": false },
+
+    {
+      "target": "lineItems",
+      "path": "IT1[]",
+      "type": "array",
+      "required": true,
+      "fields": [
+        { "target": "lineNumber", "path": "IT1.0", "transform": null,        "required": false },
+        { "target": "quantity",   "path": "IT1.1", "transform": "toInt",     "required": true  },
+        { "target": "uom",        "path": "IT1.2", "transform": null,        "required": false },
+        { "target": "unitPrice",  "path": "IT1.3", "transform": "toDecimal", "required": true  },
+        { "target": "vendorSku",  "path": "IT1[VN]","transform": null,       "required": false },
+        { "target": "buyerSku",   "path": "IT1[BP]","transform": null,       "required": false },
+        { "target": "description","path": "PID.PID.4","transform": null,     "required": false },
+        {
+          "target": "taxes",
+          "path": "TXI[]",
+          "type": "array",
+          "fields": [
+            { "target": "taxType",   "path": "TXI.0", "transform": null,        "required": false },
+            { "target": "taxAmount", "path": "TXI.1", "transform": "toDecimal", "required": false }
+          ]
+        }
+      ]
+    },
+
+    { "target": "totalAmount",   "path": "TDS.TDS.0", "transform": "toDecimal", "required": false },
+    { "target": "lineCount",     "path": "CTT.CTT.0", "transform": "toInt",     "required": false },
+    { "target": "totalQuantity", "path": "CTT.CTT.1", "transform": "toInt",     "required": false }
+  ]
+}
